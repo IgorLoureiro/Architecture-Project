@@ -1,5 +1,10 @@
-﻿using MyRecipeBook.Communication.Requests;
+﻿using AutoMapper;
+using MyRecipeBook.Application.Services.AutoMapper;
+using MyRecipeBook.Application.Services.Cryptography;
+using MyRecipeBook.Communication.Requests;
 using MyRecipeBook.Communication.Responses;
+using MyRecipeBook.Domain.Repositories.User;
+using MyRecipeBook.Exceptions.ExpectionsBase;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,12 +13,35 @@ using System.Threading.Tasks;
 
 namespace MyRecipeBook.Application.UseCases.User.Register
 {
-    public class RegisterUserUseCase
+    public class RegisterUserUseCase : IRegisterUserUseCase
     {
-        public ResponseRegisteredUserJson Execute(RequestRegisterUserJson request)
+
+        private readonly IUserWriteOnlyRepository _writeOnlyRepository;
+        private readonly IUserReadOnlyRepository _userReadOnlyRepository;
+        private readonly IMapper _mapper;
+        private readonly PasswordEncripter _passwordEncripter;
+
+        public RegisterUserUseCase(IUserWriteOnlyRepository writeOnlyRepository,
+            IUserReadOnlyRepository userReadOnlyRepository,
+            PasswordEncripter passwordEncripter,
+            IMapper mapper)
+        {
+            _writeOnlyRepository = writeOnlyRepository;
+            _userReadOnlyRepository = userReadOnlyRepository;
+            _mapper = mapper;
+            _passwordEncripter = passwordEncripter;
+        }
+
+        public async Task<ResponseRegisteredUserJson> Execute(RequestRegisterUserJson request)
         {
 
             Validate(request);
+
+            var user = _mapper.Map<Domain.Entities.User>(request);
+
+            user.Password = criptografiaDeSenha.Encrypt(request.Password);
+
+            await _writeOnlyRepository.Add(user);
 
             //Validar a request
 
@@ -35,9 +63,9 @@ namespace MyRecipeBook.Application.UseCases.User.Register
             var result = validator.Validate(request);
 
             if (result.IsValid == false) { 
-                var errorMessages = result.Errors.Select(e => e.ErrorMessage);
+                var errorMessages = result.Errors.Select(e => e.ErrorMessage).ToList();
 
-                throw new Exception();
+                throw new MyRecipeBookException();
             }
         }
     }
